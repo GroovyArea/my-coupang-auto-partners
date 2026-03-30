@@ -1,0 +1,29 @@
+# 환경변수 (절대 커밋 금지)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# DB
+db/*.db
+db/*.sqlite3
+
+# 로그
+logs/*.log
+
+# 다운로드된 이미지 캐시
+images/
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
