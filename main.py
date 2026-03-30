@@ -1,15 +1,13 @@
-import json
 import os
 import sys
 import logging
-from datetime import datetime
 from dotenv import load_dotenv
 
 from db.database import DatabaseManager
 from modules.keyword_manager import KeywordManager
 from modules.content_generator import ContentGenerator
 from modules.image_processor import ImageProcessor
-from modules.naver_publisher import NaverPublisher
+from modules.blogger_publisher import BloggerPublisher
 
 load_dotenv()
 
@@ -76,22 +74,12 @@ def main() -> None:
         "status": "pending",
     })
 
-    cookies = json.loads(os.environ.get("NAVER_COOKIES", "{}"))
-    publisher = NaverPublisher(
-        naver_id=os.environ["NAVER_ID"],
-        naver_pw=os.environ["NAVER_PW"],
-        blog_id=os.environ["NAVER_BLOG_ID"],
-        cookies=cookies,
+    publisher = BloggerPublisher(
+        token_json=os.environ["BLOGGER_TOKEN"],
+        blog_id=os.environ["BLOGGER_BLOG_ID"],
     )
 
     try:
-        if not publisher.login():
-            log.error("네이버 로그인 실패")
-            db.update_post_status(post_id, "failed", error="로그인 실패")
-            sys.exit(1)
-
-        log.info("네이버 로그인 성공")
-
         post_url = publisher.write_post(
             title=post["title"],
             body=post["body"],
@@ -114,7 +102,6 @@ def main() -> None:
         sys.exit(1)
 
     finally:
-        publisher.close()
         image_processor.cleanup()
 
     log.info("===== 자동 포스팅 완료 =====")

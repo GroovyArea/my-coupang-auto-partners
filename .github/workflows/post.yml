@@ -1,4 +1,4 @@
-name: 네이버 블로그 자동 포스팅
+name: 블로그 자동 포스팅
 
 on:
   schedule:
@@ -9,7 +9,7 @@ on:
 jobs:
   post:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - name: 코드 체크아웃
@@ -30,17 +30,12 @@ jobs:
       - name: 의존성 설치
         run: pip install -r requirements.txt
 
-      - name: Chrome 설치
-        uses: browser-actions/setup-chrome@v1
-        with:
-          chrome-version: stable
-
       - name: DB 복원 (이전 실행분)
         uses: actions/download-artifact@v4
         with:
           name: blog-db
           path: db/
-        continue-on-error: true   # 첫 실행 시 artifact 없으면 무시
+        continue-on-error: true
 
       - name: DB 초기 데이터 투입
         run: python3 db/seed.py
@@ -48,13 +43,9 @@ jobs:
       - name: 포스팅 실행
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
-          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
-          NAVER_ID: ${{ secrets.NAVER_ID }}
-          NAVER_PW: ${{ secrets.NAVER_PW }}
-          NAVER_BLOG_ID: ${{ secrets.NAVER_BLOG_ID }}
+          BLOGGER_TOKEN: ${{ secrets.BLOGGER_TOKEN }}
+          BLOGGER_BLOG_ID: ${{ secrets.BLOGGER_BLOG_ID }}
           COUPANG_AFFILIATE_ID: ${{ secrets.COUPANG_AFFILIATE_ID }}
-          NAVER_COOKIES: ${{ secrets.NAVER_COOKIES }}
         run: python3 main.py
 
       - name: DB 저장 (다음 실행을 위해)
