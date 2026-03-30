@@ -101,17 +101,20 @@ class NaverPublisher:
     ) -> Optional[str]:
         try:
             self.driver.get(f"https://blog.naver.com/{self.blog_id}/postwrite")
-            self._sleep(5.0, 6.0)
-            print(f"[NaverPublisher] current_url after navigate: {self.driver.current_url}")
+            # React SPA가 에디터를 렌더링할 때까지 대기
+            WebDriverWait(self.driver, 30).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, ".se-main-container, .se-title-input, #postTitle"))
+            )
+            self._sleep(2.0, 3.0)
         except Exception as e:
-            print(f"[NaverPublisher] navigate error: {e}")
+            print(f"[NaverPublisher] navigate/editor load error: {e}")
+            print(f"[NaverPublisher] page_source_snippet: {self.driver.page_source[:2000]}")
             self.driver.save_screenshot("/tmp/debug_navigate.png")
             return None
 
         # 제목 입력
         try:
             title_el = None
-            # SE(Smart Editor) 관련 셀렉터 다수 시도
             for selector in [
                 ".se-title-input",
                 ".se-title-input p",
@@ -132,9 +135,7 @@ class NaverPublisher:
                 except Exception:
                     continue
 
-            # 모두 실패 시 페이지 소스 덤프
             if title_el is None:
-                print(f"[NaverPublisher] page_source_snippet: {self.driver.page_source[:3000]}")
                 raise RuntimeError("title element not found")
 
             title_el.click()
