@@ -107,10 +107,20 @@ class NaverPublisher:
             self.driver.save_screenshot("/tmp/debug_navigate.png")
             return None
 
+        # 에디터 iframe 전환 (Smart Editor One은 mainFrame 안에 있음)
+        try:
+            WebDriverWait(self.driver, 15).until(
+                EC.frame_to_be_available_and_switch_to_it((By.CSS_SELECTOR, "iframe#mainFrame, iframe[name='mainFrame']"))
+            )
+            self._sleep(2.0, 3.0)
+        except Exception:
+            # iframe이 없으면 기본 컨텍스트 그대로 사용
+            pass
+
         # 제목 입력
         try:
             title_el = None
-            for selector in [".se-title-input", '[placeholder*="제목"]']:
+            for selector in [".se-title-input", '[placeholder*="제목"]', ".tit_area .input_tit", "#subject"]:
                 try:
                     title_el = WebDriverWait(self.driver, 10).until(
                         EC.presence_of_element_located((By.CSS_SELECTOR, selector))
@@ -277,6 +287,12 @@ class NaverPublisher:
         except Exception as e:
             print(f"[NaverPublisher] confirm publish error: {e}")
             self.driver.save_screenshot("/tmp/debug_confirm.png")
+
+        # iframe에서 빠져나와 URL 확인
+        try:
+            self.driver.switch_to.default_content()
+        except Exception:
+            pass
 
         # 발행된 URL 반환
         try:
