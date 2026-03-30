@@ -102,29 +102,40 @@ class NaverPublisher:
         try:
             self.driver.get(f"https://blog.naver.com/{self.blog_id}/postwrite")
             self._sleep(5.0, 6.0)
+            print(f"[NaverPublisher] current_url after navigate: {self.driver.current_url}")
         except Exception as e:
             print(f"[NaverPublisher] navigate error: {e}")
             self.driver.save_screenshot("/tmp/debug_navigate.png")
             return None
 
         # 에디터 iframe 전환 (Smart Editor One은 mainFrame 안에 있음)
-        try:
-            WebDriverWait(self.driver, 15).until(
-                EC.frame_to_be_available_and_switch_to_it((By.CSS_SELECTOR, "iframe#mainFrame, iframe[name='mainFrame']"))
-            )
-            self._sleep(2.0, 3.0)
-        except Exception:
-            # iframe이 없으면 기본 컨텍스트 그대로 사용
-            pass
+        iframes = self.driver.find_elements(By.TAG_NAME, "iframe")
+        print(f"[NaverPublisher] found {len(iframes)} iframes: {[(f.get_attribute('id'), f.get_attribute('name'), f.get_attribute('src')) for f in iframes]}")
+        switched_frame = False
+        for frame_sel in ["iframe#mainFrame", "iframe[name='mainFrame']", "iframe"]:
+            try:
+                WebDriverWait(self.driver, 5).until(
+                    EC.frame_to_be_available_and_switch_to_it((By.CSS_SELECTOR, frame_sel))
+                )
+                self._sleep(2.0, 3.0)
+                print(f"[NaverPublisher] switched to frame: {frame_sel}")
+                switched_frame = True
+                break
+            except Exception:
+                continue
+
+        if not switched_frame:
+            print("[NaverPublisher] no iframe found, using default context")
 
         # 제목 입력
         try:
             title_el = None
-            for selector in [".se-title-input", '[placeholder*="제목"]', ".tit_area .input_tit", "#subject"]:
+            for selector in [".se-title-input", '[placeholder*="제목"]', ".tit_area .input_tit", "#subject", "textarea[name='subject']", "input[name='subject']"]:
                 try:
-                    title_el = WebDriverWait(self.driver, 10).until(
+                    title_el = WebDriverWait(self.driver, 5).until(
                         EC.presence_of_element_located((By.CSS_SELECTOR, selector))
                     )
+                    print(f"[NaverPublisher] found title el with: {selector}")
                     break
                 except Exception:
                     continue
