@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import logging
@@ -75,10 +76,12 @@ def main() -> None:
         "status": "pending",
     })
 
+    cookies = json.loads(os.environ.get("NAVER_COOKIES", "{}"))
     publisher = NaverPublisher(
         naver_id=os.environ["NAVER_ID"],
         naver_pw=os.environ["NAVER_PW"],
         blog_id=os.environ["NAVER_BLOG_ID"],
+        cookies=cookies,
     )
 
     try:

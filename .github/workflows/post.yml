@@ -54,6 +54,7 @@ jobs:
           NAVER_PW: ${{ secrets.NAVER_PW }}
           NAVER_BLOG_ID: ${{ secrets.NAVER_BLOG_ID }}
           COUPANG_AFFILIATE_ID: ${{ secrets.COUPANG_AFFILIATE_ID }}
+          NAVER_COOKIES: ${{ secrets.NAVER_COOKIES }}
         run: python3 main.py
 
       - name: DB 저장 (다음 실행을 위해)
