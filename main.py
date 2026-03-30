@@ -1,0 +1,121 @@
+import os
+import sys
+import logging
+from datetime import datetime
+from dotenv import load_dotenv
+
+from db.database import DatabaseManager
+from modules.keyword_manager import KeywordManager
+from modules.content_generator import ContentGenerator
+from modules.image_processor import ImageProcessor
+from modules.naver_publisher import NaverPublisher
+
+load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("logs/run.log"),
+        logging.StreamHandler(sys.stdout),
+    ]
+)
+log = logging.getLogger(__name__)
+
+
+def main() -> None:
+    log.info("===== 자동 포스팅 시작 =====")
+
+    db = DatabaseManager()
+    db.init_db()
+
+    today_count = db.get_today_post_count()
+    if today_count >= 2:
+        log.info(f"오늘 이미 {today_count}건 발행 완료. 종료.")
+        return
+
+    keyword_manager = KeywordManager(db)
+    next_item = keyword_manager.get_next()
+    if not next_item:
+        log.warning("발행할 키워드 또는 상품 없음. 종료.")
+        sys.exit(0)
+
+    keyword = next_item["keyword"]
+    keyword_id = next_item["keyword_id"]
+    post_type = next_item["post_type"]
+    products = next_item["products"]
+    product = products[0]
+
+    log.info(f"키워드: {keyword} | 타입: {post_type} | 상품: {product['name']}")
+
+    image_processor = ImageProcessor()
+    image_path = None
+    if product.get("image_url"):
+        image_path = image_processor.download_and_resize(product["image_url"])
+        if image_path:
+            log.info(f"이미지 다운로드 완료: {image_path}")
+        else:
+            log.warning("이미지 다운로드 실패, 이미지 없이 진행")
+
+    generator = ContentGenerator(api_key=os.environ["GROQ_API_KEY"])
+    try:
+        post = generator.generate(product, keyword, post_type)
+    except Exception as e:
+        log.error(f"콘텐츠 생성 실패: {e}")
+        sys.exit(1)
+
+    log.info(f"생성된 제목: {post['title']}")
+
+    post_id = db.create_post({
+        "product_id": product["id"],
+        "keyword_id": keyword_id,
+        "post_type": post_type,
+        "title": post["title"],
+        "content_preview": post["body"][:200],
+        "status": "pending",
+    })
+
+    publisher = NaverPublisher(
+        naver_id=os.environ["NAVER_ID"],
+        naver_pw=os.environ["NAVER_PW"],
+        blog_id=os.environ["NAVER_BLOG_ID"],
+    )
+
+    try:
+        if not publisher.login():
+            log.error("네이버 로그인 실패")
+            db.update_post_status(post_id, "failed", error="로그인 실패")
+            sys.exit(1)
+
+        log.info("네이버 로그인 성공")
+
+        post_url = publisher.write_post(
+            title=post["title"],
+            body=post["body"],
+            image_path=image_path,
+            tags=post["tags"],
+        )
+
+        if post_url:
+            db.update_post_status(post_id, "success", url=post_url)
+            keyword_manager.mark_used(keyword_id)
+            log.info(f"발행 완료: {post_url}")
+        else:
+            db.update_post_status(post_id, "failed", error="발행 URL 없음")
+            log.error("발행 실패: URL 반환 없음")
+            sys.exit(1)
+
+    except Exception as e:
+        log.error(f"발행 중 예외 발생: {e}")
+        db.update_post_status(post_id, "failed", error=str(e))
+        sys.exit(1)
+
+    finally:
+        publisher.close()
+        image_processor.cleanup()
+
+    log.info("===== 자동 포스팅 완료 =====")
+
+
+if __name__ == "__main__":
+    main()

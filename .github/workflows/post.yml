@@ -1,0 +1,71 @@
+name: 네이버 블로그 자동 포스팅
+
+on:
+  schedule:
+    - cron: "0 1 * * *"   # KST 10:00 (UTC 01:00)
+    - cron: "0 6 * * *"   # KST 15:00 (UTC 06:00)
+  workflow_dispatch:        # 수동 실행
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 설치
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: pip 캐시
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: pip-
+
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+
+      - name: Chrome 설치
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+
+      - name: DB 복원 (이전 실행분)
+        uses: actions/download-artifact@v4
+        with:
+          name: blog-db
+          path: db/
+        continue-on-error: true   # 첫 실행 시 artifact 없으면 무시
+
+      - name: 포스팅 실행
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+          NAVER_ID: ${{ secrets.NAVER_ID }}
+          NAVER_PW: ${{ secrets.NAVER_PW }}
+          NAVER_BLOG_ID: ${{ secrets.NAVER_BLOG_ID }}
+          COUPANG_AFFILIATE_ID: ${{ secrets.COUPANG_AFFILIATE_ID }}
+        run: python main.py
+
+      - name: DB 저장 (다음 실행을 위해)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blog-db
+          path: db/coupang_blog.db
+          retention-days: 90
+          overwrite: true
+
+      - name: 로그 저장
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: run-log-${{ github.run_number }}
+          path: logs/run.log
+          retention-days: 30
