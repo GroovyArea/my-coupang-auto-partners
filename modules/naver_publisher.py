@@ -108,29 +108,21 @@ class NaverPublisher:
             self.driver.save_screenshot("/tmp/debug_navigate.png")
             return None
 
-        # 에디터 iframe 전환 (Smart Editor One은 mainFrame 안에 있음)
-        iframes = self.driver.find_elements(By.TAG_NAME, "iframe")
-        print(f"[NaverPublisher] found {len(iframes)} iframes: {[(f.get_attribute('id'), f.get_attribute('name'), f.get_attribute('src')) for f in iframes]}")
-        switched_frame = False
-        for frame_sel in ["iframe#mainFrame", "iframe[name='mainFrame']", "iframe"]:
-            try:
-                WebDriverWait(self.driver, 5).until(
-                    EC.frame_to_be_available_and_switch_to_it((By.CSS_SELECTOR, frame_sel))
-                )
-                self._sleep(2.0, 3.0)
-                print(f"[NaverPublisher] switched to frame: {frame_sel}")
-                switched_frame = True
-                break
-            except Exception:
-                continue
-
-        if not switched_frame:
-            print("[NaverPublisher] no iframe found, using default context")
-
         # 제목 입력
         try:
             title_el = None
-            for selector in [".se-title-input", '[placeholder*="제목"]', ".tit_area .input_tit", "#subject", "textarea[name='subject']", "input[name='subject']"]:
+            # SE(Smart Editor) 관련 셀렉터 다수 시도
+            for selector in [
+                ".se-title-input",
+                ".se-title-input p",
+                '[contenteditable="true"][class*="title"]',
+                '[placeholder*="제목"]',
+                "#postTitle",
+                "input#postTitle",
+                "textarea#postTitle",
+                ".tit_area .input_tit",
+                "#subject",
+            ]:
                 try:
                     title_el = WebDriverWait(self.driver, 5).until(
                         EC.presence_of_element_located((By.CSS_SELECTOR, selector))
@@ -140,7 +132,9 @@ class NaverPublisher:
                 except Exception:
                     continue
 
+            # 모두 실패 시 페이지 소스 덤프
             if title_el is None:
+                print(f"[NaverPublisher] page_source_snippet: {self.driver.page_source[:3000]}")
                 raise RuntimeError("title element not found")
 
             title_el.click()
