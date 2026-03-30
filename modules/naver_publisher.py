@@ -14,10 +14,11 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 
 class NaverPublisher:
-    def __init__(self, naver_id: str, naver_pw: str, blog_id: str):
+    def __init__(self, naver_id: str, naver_pw: str, blog_id: str, cookies: dict = None):
         self.naver_id = naver_id
         self.naver_pw = naver_pw
         self.blog_id = blog_id
+        self.cookies = cookies or {}
         self.driver = self._init_driver()
 
     def _init_driver(self) -> webdriver.Chrome:
@@ -49,18 +50,34 @@ class NaverPublisher:
 
     def login(self) -> bool:
         try:
+            # 쿠키 기반 인증 (NAVER_COOKIES 환경변수 우선)
+            if self.cookies.get("NID_AUT") and self.cookies.get("NID_SES"):
+                # 쿠키는 도메인 접속 후에만 주입 가능
+                self.driver.get("https://www.naver.com")
+                self._sleep(1.0, 2.0)
+
+                self.driver.add_cookie({"name": "NID_AUT", "value": self.cookies["NID_AUT"], "domain": ".naver.com"})
+                self.driver.add_cookie({"name": "NID_SES", "value": self.cookies["NID_SES"], "domain": ".naver.com"})
+
+                # 로그인 상태 확인
+                self.driver.get("https://www.naver.com")
+                self._sleep(1.5, 2.5)
+
+                # 로그인 여부: 로그인 버튼이 없으면 성공
+                login_btns = self.driver.find_elements(By.CSS_SELECTOR, "#gnb_login_button, .gnb_login_button")
+                if not login_btns:
+                    return True
+
+                self.driver.save_screenshot("/tmp/debug_login_fail.png")
+                return False
+
+            # 폴백: ID/PW 직접 로그인 (로컬 환경용)
             self.driver.get("https://nid.naver.com/nidlogin.login")
             self._sleep(1.0, 2.0)
-
-            self.driver.execute_script(
-                "document.getElementById('id').value = arguments[0]", self.naver_id
-            )
+            self.driver.execute_script("document.getElementById('id').value = arguments[0]", self.naver_id)
             self._sleep()
-            self.driver.execute_script(
-                "document.getElementById('pw').value = arguments[0]", self.naver_pw
-            )
+            self.driver.execute_script("document.getElementById('pw').value = arguments[0]", self.naver_pw)
             self._sleep()
-
             self.driver.find_element(By.ID, "log.login").click()
             self._sleep(2.0, 3.0)
 
