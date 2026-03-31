@@ -31,20 +31,36 @@ class BloggerPublisher:
         try:
             # 쿠팡 파트너스 고지 문구 (이용약관 필수) — 최상단
             disclosure = (
-                "<p><small>⚠️ 이 포스팅은 쿠팡 파트너스 활동의 일환으로, "
-                "이에 따른 일정액의 수수료를 제공받습니다.</small></p><hr>"
+                '<p style="font-size:12px;color:#888;border:1px solid #ddd;'
+                'padding:8px 12px;border-radius:4px;">'
+                "⚠️ 이 포스팅은 쿠팡 파트너스 활동의 일환으로, "
+                "이에 따른 일정액의 수수료를 제공받습니다.</p>"
             )
+            # 상품 이미지 — 고지 문구 바로 아래
+            image_html = ""
+            if image_path and os.path.exists(image_path):
+                import base64
+                with open(image_path, "rb") as f:
+                    img_b64 = base64.b64encode(f.read()).decode()
+                ext = os.path.splitext(image_path)[1].lstrip(".") or "jpeg"
+                image_html = (
+                    f'<p style="text-align:center;">'
+                    f'<img src="data:image/{ext};base64,{img_b64}" '
+                    f'style="max-width:100%;border-radius:8px;" alt="상품 이미지"/></p>'
+                )
             # 쿠팡 구매 버튼 — 본문 하단
             buy_button = ""
             if coupang_url:
                 buy_button = (
-                    f'<br><br><p style="text-align:center;">'
-                    f'<a href="{coupang_url}" target="_blank" '
-                    f'style="background:#e4003b;color:#fff;padding:12px 24px;'
-                    f'border-radius:6px;text-decoration:none;font-weight:bold;">'
-                    f'쿠팡에서 최저가 확인하기 →</a></p>'
+                    '<div style="text-align:center;margin:24px 0;">'
+                    f'<a href="{coupang_url}" target="_blank" rel="nofollow" '
+                    'style="background:#e4003b;color:#fff;padding:14px 32px;'
+                    'border-radius:8px;text-decoration:none;font-weight:bold;'
+                    'font-size:16px;display:inline-block;">'
+                    '🛒 쿠팡에서 최저가 확인하기</a></div>'
                 )
-            content = disclosure + body.replace("\n", "<br>") + buy_button
+            # body는 AI가 HTML로 생성하므로 그대로 사용
+            content = disclosure + image_html + body + buy_button
 
             post_body = {
                 "title": title,

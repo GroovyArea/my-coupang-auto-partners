@@ -38,8 +38,8 @@ class ContentGenerator:
         result = result.replace("{KEYWORD}", str(keyword))
         result = result.replace("{PRODUCT_NAME}", str(product.get("name", "")))
         result = result.replace("{PRICE}", str(product.get("price", "")))
-        result = result.replace("{URL}", str(product.get("url", "")))
         result = result.replace("{RATING}", str(product.get("rating", "")))
+        result = result.replace("{REVIEW_COUNT}", str(product.get("review_count", "")))
         result = result.replace("{CATEGORY}", str(product.get("category", "")))
         return result
 
