@@ -86,6 +86,7 @@ def main() -> None:
             image_path=image_path,
             tags=post["tags"],
             coupang_url=product.get("coupang_url", ""),
+            product=product,
         )
 
         if post_url:
