@@ -46,6 +46,7 @@ jobs:
           BLOGGER_TOKEN: ${{ secrets.BLOGGER_TOKEN }}
           BLOGGER_BLOG_ID: ${{ secrets.BLOGGER_BLOG_ID }}
           COUPANG_AFFILIATE_ID: ${{ secrets.COUPANG_AFFILIATE_ID }}
+          GOOGLE_INDEXING_SA: ${{ secrets.GOOGLE_INDEXING_SA }}
         run: python3 main.py
 
       - name: 키워드 잔여량 확인 및 알림

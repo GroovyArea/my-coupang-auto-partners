@@ -8,6 +8,7 @@ from modules.keyword_manager import KeywordManager
 from modules.content_generator import ContentGenerator
 from modules.image_processor import ImageProcessor
 from modules.blogger_publisher import BloggerPublisher
+from modules.indexing_notifier import IndexingNotifier
 
 load_dotenv()
 
@@ -93,6 +94,14 @@ def main() -> None:
             db.update_post_status(post_id, "success", url=post_url)
             keyword_manager.mark_used(keyword_id)
             log.info(f"발행 완료: {post_url}")
+
+            sa_json = os.environ.get("GOOGLE_INDEXING_SA")
+            if sa_json:
+                notifier = IndexingNotifier(sa_json)
+                if notifier.notify(post_url):
+                    log.info(f"Google 색인 요청 완료: {post_url}")
+                else:
+                    log.warning("Google 색인 요청 실패 (무시)")
         else:
             db.update_post_status(post_id, "failed", error="발행 URL 없음")
             log.error("발행 실패: URL 반환 없음")
