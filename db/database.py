@@ -135,6 +135,16 @@ class DatabaseManager:
                 (status, url, error, published_at, post_id),
             )
 
+    def get_remaining_keyword_count(self) -> int:
+        """7일 이내 사용되지 않은 발행 가능한 키워드 수 반환"""
+        with self._connect() as conn:
+            row = conn.execute(
+                """SELECT COUNT(*) AS cnt FROM keywords
+                   WHERE last_used_at IS NULL
+                      OR DATE(last_used_at) <= DATE('now', '-7 days')"""
+            ).fetchone()
+            return row["cnt"]
+
     def mark_keyword_used(self, keyword_id: int):
         with self._connect() as conn:
             conn.execute(

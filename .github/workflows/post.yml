@@ -48,6 +48,12 @@ jobs:
           COUPANG_AFFILIATE_ID: ${{ secrets.COUPANG_AFFILIATE_ID }}
         run: python3 main.py
 
+      - name: 키워드 잔여량 확인 및 알림
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KEYWORD_THRESHOLD: "4"
+        run: python3 tools/check_keywords.py
+
       - name: DB 저장 (다음 실행을 위해)
         uses: actions/upload-artifact@v4
         if: always()
