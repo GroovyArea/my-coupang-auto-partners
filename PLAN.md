@@ -6,9 +6,9 @@
 
 - **블로그 플랫폼**: Google Blogger (blogspot.com)
 - **인프라**: GitHub Actions (무료, 공개 레포)
-- **AI**: Groq API — Llama 3.1 8B (무료 티어)
+- **AI**: Claude API (고품질) / Groq API fallback (무료)
 - **DB**: SQLite + GitHub Artifact (90일 보존)
-- **총 비용**: 0원
+- **SEO**: 네이버 상위 블로그 분석 기반 벤치마크 + 품질 검사
 
 ---
 
@@ -17,15 +17,18 @@
 ```
 GitHub Actions (cron)
     │
-    ├─ db/seed.py          → SQLite에 키워드/상품 데이터 투입
-    ├─ modules/keyword_manager.py  → 다음 발행할 키워드 선택
-    ├─ modules/content_generator.py → Groq API로 한국어 포스트 생성
+    ├─ db/seed.py                  → SQLite에 키워드/상품 데이터 투입
+    ├─ modules/keyword_manager.py  → 다음 발행할 키워드 랜덤 선택
+    ├─ modules/seo_analyzer.py     → 네이버 상위 글 분석 → 벤치마크 생성
+    ├─ modules/content_generator.py → Claude/Groq API로 포스트 생성
+    │       └─ 품질 검사 FAIL 시 피드백 반영 자동 재생성
     └─ modules/blogger_publisher.py → Blogger REST API로 발행
+            └─ 발행 성공 시 해당 키워드 DB에서 삭제
 ```
 
 ---
 
-## 운영 준비 단계 (완료)
+## 운영 준비 단계
 
 | 단계 | 내용 | 상태 |
 |---|---|---|
@@ -37,17 +40,26 @@ GitHub Actions (cron)
 | 6 | OAuth 2.0 토큰 발급 | ✅ |
 | 7 | GitHub Secrets 등록 | ✅ |
 | 8 | 상품 seed 데이터 입력 | ✅ |
+| 9 | Claude API 키 발급 및 Secrets 등록 | ⬜ |
+| 10 | 네이버 검색 API 키 발급 및 Secrets 등록 (선택) | ⬜ |
 
 ---
 
 ## GitHub Secrets
 
-| Secret명 | 설명 |
-|---|---|
-| `GROQ_API_KEY` | Groq API 인증키 |
-| `BLOGGER_TOKEN` | Google OAuth 2.0 토큰 JSON |
-| `BLOGGER_BLOG_ID` | Blogger 블로그 ID (`1529431367190128336`) |
-| `COUPANG_AFFILIATE_ID` | 쿠팡 파트너스 ID (`AF5006969`) |
+| Secret명 | 필수 여부 | 설명 | 발급처 |
+|---|---|---|---|
+| `ANTHROPIC_API_KEY` | 권장 | Claude API 인증키 | console.anthropic.com |
+| `GROQ_API_KEY` | 필수(fallback) | Groq API 인증키 | console.groq.com |
+| `BLOGGER_TOKEN` | 필수 | Google OAuth 2.0 토큰 JSON | `python3 tools/get_blogger_token.py` |
+| `BLOGGER_BLOG_ID` | 필수 | Blogger 블로그 ID | Blogger 대시보드 URL |
+| `COUPANG_AFFILIATE_ID` | 필수 | 쿠팡 파트너스 ID (AF5006969) | partners.coupang.com |
+| `GOOGLE_INDEXING_SA` | 선택 | Google Search Console 색인 Service Account JSON | Google Cloud Console |
+| `NAVER_CLIENT_ID` | 선택 | 네이버 검색 API Client ID | developers.naver.com |
+| `NAVER_CLIENT_SECRET` | 선택 | 네이버 검색 API Secret | developers.naver.com |
+
+> ANTHROPIC_API_KEY 없으면 GROQ_API_KEY로 자동 fallback.
+> NAVER_CLIENT_ID/SECRET 없으면 벤치마크 기본값(본문 2000자 등)으로 동작.
 
 ---
 
@@ -55,7 +67,26 @@ GitHub Actions (cron)
 
 - **KST 10:00** (UTC 01:00) — 1일 1회차
 - **KST 15:00** (UTC 06:00) — 1일 2회차
-- 하루 최대 2건, DB에 기록하여 중복 발행 방지
+- 하루 최대 2건, 오늘 이미 발행한 키워드는 재선택 안 함
+- **발행 성공 시 해당 키워드/상품 DB에서 삭제** (소진 방식)
+
+---
+
+## 발행 파이프라인 상세
+
+```
+1. DB에서 키워드 랜덤 선택 (오늘 발행분 제외)
+2. 상품 이미지 다운로드 + 리사이즈
+3. 네이버 상위 블로그 분석 → 벤치마크 수치 추출
+   (목표 본문 길이, 키워드 빈도, 제목 패턴 등)
+4. Claude/Groq API로 벤치마크 기반 글 생성
+5. 품질 검사 (70점 이상 pass)
+   → FAIL 시 피드백 반영하여 1회 재생성
+6. Google Blogger API로 발행
+7. Google Search Console 색인 요청
+8. DB에서 해당 키워드/상품 삭제
+9. 잔여 키워드 4개 이하 → GitHub Issue 자동 생성
+```
 
 ---
 
@@ -69,16 +100,18 @@ my-coupang-auto-partners/
 ├── .github/workflows/post.yml      # GitHub Actions 워크플로우
 ├── db/
 │   ├── database.py                 # SQLite 관리
-│   └── seed.py                     # 초기 키워드/상품 데이터
+│   └── seed.py                     # 키워드/상품 데이터 추가
 ├── modules/
-│   ├── keyword_manager.py          # 키워드 선택 로직
-│   ├── content_generator.py        # Groq API 포스트 생성
+│   ├── keyword_manager.py          # 키워드 선택/삭제 로직
+│   ├── seo_analyzer.py             # 네이버 상위 글 벤치마크 + 품질 검사
+│   ├── content_generator.py        # Claude/Groq API 포스트 생성
 │   ├── image_processor.py          # 이미지 다운로드/리사이즈
 │   └── blogger_publisher.py        # Blogger REST API 발행
 ├── prompts/
 │   ├── single_review.txt           # 단일 상품 리뷰 프롬프트
 │   └── problem_solve.txt           # 문제 해결형 프롬프트
 └── tools/
+    ├── check_keywords.py           # 잔여 키워드 확인 + GitHub Issue 알림
     └── get_blogger_token.py        # OAuth 토큰 발급 도구 (로컬 1회 실행)
 ```
 
@@ -103,7 +136,7 @@ my-coupang-auto-partners/
 | 주기 | 작업 |
 |---|---|
 | 월 1회 | `python3 tools/get_blogger_token.py` — OAuth 토큰 갱신 |
-| 분기 1회 | `db/seed.py` — 신규 키워드/상품 추가 |
+| 수시 | `db/seed.py`에 신규 키워드/상품 추가 (GitHub Issue 알림 기준) |
 | 수시 | GitHub Actions 로그 확인, 실패 시 원인 파악 |
 
 ---
@@ -114,6 +147,7 @@ my-coupang-auto-partners/
 - [ ] 구글 애드센스 블로그 승인 신청 (트래픽 쌓인 후)
 - [ ] Google Search Console 등록으로 구글 색인 가속
 - [ ] 포스트 수 30개 이상 → 애드센스 심사 적합 수준 확보
+- [ ] 네이버 검색광고 API 연동으로 트렌드 키워드 자동 발굴
 
 ---
 

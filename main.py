@@ -9,6 +9,7 @@ from modules.content_generator import ContentGenerator
 from modules.image_processor import ImageProcessor
 from modules.blogger_publisher import BloggerPublisher
 from modules.indexing_notifier import IndexingNotifier
+from modules.seo_analyzer import get_benchmark, quality_check
 
 load_dotenv()
 
@@ -48,6 +49,7 @@ def main() -> None:
 
     log.info(f"키워드: {keyword} | 타입: {post_type} | 상품: {product['name']}")
 
+    # ── 이미지 처리 ─────────────────────────────────────────────
     image_processor = ImageProcessor()
     image_path = None
     if product.get("image_url"):
@@ -57,15 +59,41 @@ def main() -> None:
         else:
             log.warning("이미지 다운로드 실패, 이미지 없이 진행")
 
-    generator = ContentGenerator(api_key=os.environ["GROQ_API_KEY"])
+    # ── SEO 벤치마크 수집 ────────────────────────────────────────
+    benchmark = None
     try:
-        post = generator.generate(product, keyword, post_type)
+        benchmark = get_benchmark(keyword)
+    except Exception as e:
+        log.warning(f"벤치마크 수집 실패 (건너뜀): {e}")
+
+    # ── 콘텐츠 생성 ──────────────────────────────────────────────
+    generator = ContentGenerator()
+    try:
+        post = generator.generate(product, keyword, post_type, benchmark=benchmark)
     except Exception as e:
         log.error(f"콘텐츠 생성 실패: {e}")
         sys.exit(1)
 
     log.info(f"생성된 제목: {post['title']}")
 
+    # ── 품질 검사 + 재생성 ───────────────────────────────────────
+    if benchmark:
+        try:
+            qc = quality_check(post["title"], post["body"], keyword, benchmark)
+            if not qc["passed"] and qc["suggestions"]:
+                log.info(f"품질 FAIL (점수: {qc['score']}/100) — 피드백 반영 후 재생성")
+                post = generator.generate(
+                    product, keyword, post_type,
+                    benchmark=benchmark,
+                    suggestions=qc["suggestions"],
+                )
+                log.info(f"재생성 완료: {post['title']}")
+            else:
+                log.info(f"품질 PASS (점수: {qc['score']}/100)")
+        except Exception as e:
+            log.warning(f"품질 검사 실패 (건너뜀): {e}")
+
+    # ── DB에 pending 상태로 기록 ─────────────────────────────────
     post_id = db.create_post({
         "product_id": product["id"],
         "keyword_id": keyword_id,
@@ -75,6 +103,7 @@ def main() -> None:
         "status": "pending",
     })
 
+    # ── 발행 ─────────────────────────────────────────────────────
     publisher = BloggerPublisher(
         token_json=os.environ["BLOGGER_TOKEN"],
         blog_id=os.environ["BLOGGER_BLOG_ID"],

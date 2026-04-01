@@ -95,8 +95,7 @@ class DatabaseManager:
                        SELECT DISTINCT keyword_id FROM posts
                        WHERE DATE(created_at) = ? AND keyword_id IS NOT NULL
                    )
-                   AND (last_used_at IS NULL OR DATE(last_used_at) <= DATE('now', '-7 days'))
-                   ORDER BY used_count ASC, last_used_at ASC
+                   ORDER BY RANDOM()
                    LIMIT 1""",
                 (today,),
             ).fetchone()
@@ -144,6 +143,19 @@ class DatabaseManager:
                       OR DATE(last_used_at) <= DATE('now', '-7 days')"""
             ).fetchone()
             return row["cnt"]
+
+    def delete_keyword(self, keyword_id: int):
+        """발행 완료된 키워드와 연결된 상품을 DB에서 삭제합니다."""
+        with self._connect() as conn:
+            # keyword_id로 keyword 텍스트 조회 (products 삭제에 필요)
+            row = conn.execute(
+                "SELECT keyword FROM keywords WHERE id = ?", (keyword_id,)
+            ).fetchone()
+            if row:
+                conn.execute(
+                    "DELETE FROM products WHERE keyword = ?", (row["keyword"],)
+                )
+            conn.execute("DELETE FROM keywords WHERE id = ?", (keyword_id,))
 
     def mark_keyword_used(self, keyword_id: int):
         with self._connect() as conn:

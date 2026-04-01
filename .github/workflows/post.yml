@@ -9,7 +9,7 @@ on:
 jobs:
   post:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: 코드 체크아웃
@@ -31,22 +31,35 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: DB 복원 (이전 실행분)
+        id: restore_db
         uses: actions/download-artifact@v4
         with:
           name: blog-db
           path: db/
         continue-on-error: true
 
+      - name: DB 복원 상태 확인
+        run: |
+          if [ "${{ steps.restore_db.outcome }}" = "success" ]; then
+            echo "DB 복원 성공"
+            ls -la db/
+          else
+            echo "DB 없음 (최초 실행 또는 복원 실패) — 새 DB로 시작"
+          fi
+
       - name: DB 초기 데이터 투입
         run: python3 db/seed.py
 
       - name: 포스팅 실행
         env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           BLOGGER_TOKEN: ${{ secrets.BLOGGER_TOKEN }}
           BLOGGER_BLOG_ID: ${{ secrets.BLOGGER_BLOG_ID }}
           COUPANG_AFFILIATE_ID: ${{ secrets.COUPANG_AFFILIATE_ID }}
           GOOGLE_INDEXING_SA: ${{ secrets.GOOGLE_INDEXING_SA }}
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
         run: python3 main.py
 
       - name: 키워드 잔여량 확인 및 알림

@@ -24,4 +24,4 @@ class KeywordManager:
         }
 
     def mark_used(self, keyword_id: int):
-        self.db.mark_keyword_used(keyword_id)
+        self.db.delete_keyword(keyword_id)
