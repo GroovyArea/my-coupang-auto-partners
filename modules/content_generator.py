@@ -141,7 +141,7 @@ class ContentGenerator:
             try:
                 response = self._client.messages.create(
                     model="claude-sonnet-4-6",
-                    max_tokens=4000,
+                    max_tokens=6000,
                     messages=[{"role": "user", "content": prompt}],
                 )
                 return response.content[0].text
@@ -163,7 +163,7 @@ class ContentGenerator:
                 response = self._client.chat.completions.create(
                     model="llama-3.1-8b-instant",
                     messages=[{"role": "user", "content": prompt}],
-                    max_tokens=3000,
+                    max_tokens=6000,
                     temperature=0.75,
                     response_format={"type": "json_object"},
                 )
