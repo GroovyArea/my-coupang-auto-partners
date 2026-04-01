@@ -161,9 +161,9 @@ class ContentGenerator:
         for attempt in range(max_retries):
             try:
                 response = self._client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
+                    model="llama-3.3-70b-versatile",
                     messages=[{"role": "user", "content": prompt}],
-                    max_tokens=6000,
+                    max_tokens=4500,
                     temperature=0.75,
                     response_format={"type": "json_object"},
                 )
